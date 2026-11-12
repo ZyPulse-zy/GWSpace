@@ -456,13 +456,18 @@ class GCBWaveform(BasicWaveform):
         N = 1 << int(np.ceil(np.log2(N)))  # next power of 2
         return N*oversample
 
-    def get_fastgb_fd_single(self, dt, oversample=1, detector='TianQin', buffer=None):
+    def get_fastgb_fd_single(self, dt, oversample=1, detector='TianQin', buffer=None,
+                             *, endpoint_correction=False):
         """ Calculate the GCB waveform using fast/slow decomposition.
 
         :param dt: Sampling step of time
         :param oversample: Should be a power of 2, or it will be not able to use gsl_fft
         :param detector:
         :param buffer: Should be a tuple with
+        :param endpoint_correction: Correct the slow-envelope endpoint jump in
+            the finite-interval Fourier quadrature. Default False preserves the
+            original FFT. This changes neither the output bins nor the response
+            model; it does not include all finite-window TDI boundary terms.
         """
         # FIXME: assume T=T_obs below
         N = self._buffer_size(detector, oversample)
@@ -479,7 +484,8 @@ class GCBWaveform(BasicWaveform):
 
         if np.all(params) is not None:
             libFastGB.ComputeXYZ_FD(params, N, self.T_obs, dt, XLS, YLS, ZLS, XSL, YSL, ZSL,
-                                    len(params), detector=detector)
+                                    len(params), detector=detector,
+                                    endpoint_correction=endpoint_correction)
             # Xf, Yf, Zf = XLS, YLS, ZLS
             Xf, Yf, Zf = XSL, YSL, ZSL
         else:
@@ -503,17 +509,19 @@ class GCBWaveform(BasicWaveform):
             for i, a in enumerate((Xf, Yf, Zf)):
                 buffer[i][begb:endb] += a[bega:enda]
 
-    def get_fastgb_fd(self, dt, oversample=1, detector='TianQin'):
+    def get_fastgb_fd(self, dt, oversample=1, detector='TianQin', *, endpoint_correction=False):
         length = int(0.5*self.T_obs/dt)+1  # NFFT=int(T/dt), length=NFFT/2+1
         buffer = tuple(np.zeros(length, dtype=np.complex128) for _ in range(3))
 
         # for _ in table: TODO: make it support multiple sources?
-        self.get_fastgb_fd_single(dt, oversample, detector, buffer)
+        self.get_fastgb_fd_single(dt, oversample, detector, buffer,
+                                 endpoint_correction=endpoint_correction)
         f = np.linspace(0, (length-1)*1.0/self.T_obs, length)
         return (f, ) + buffer
 
-    def get_fastgb_td(self, dt, oversample=1, detector='TianQin'):
-        f, X, Y, Z = self.get_fastgb_fd(dt, oversample, detector)
+    def get_fastgb_td(self, dt, oversample=1, detector='TianQin', *, endpoint_correction=False):
+        f, X, Y, Z = self.get_fastgb_fd(dt, oversample, detector,
+                                     endpoint_correction=endpoint_correction)
         df = 1.0/self.T_obs
         kmin = round(f[0]/df)
 

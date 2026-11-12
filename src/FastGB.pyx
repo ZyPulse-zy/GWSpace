@@ -13,6 +13,10 @@ cdef extern from "GB.h":
                  double* XLS, double* YLS, double* ZLS,
                  double* XSL, double* YSL, double* ZSL, 
                  int NP, char detector[])
+    void Fast_GB_endpoint(double* pars, long N, double Tobs, double dt,
+                 double* XLS, double* YLS, double* ZLS,
+                 double* XSL, double* YSL, double* ZSL,
+                 int NP, char detector[])
 
 cdef extern from "spacecrafts.h":
     void spacecraft(char detector[], int N, double *t, double *x, double *y, double *z, double *Larm);
@@ -27,7 +31,10 @@ cdef extern from "spacecrafts.h":
 cpdef ComputeXYZ_FD(double[:] params, long N, double Tobs, double dt,
         double[:] XLS, double[:] YLS, double[:] ZLS, 
         double[:] XSL, double[:] YSL, double[:] ZSL, 
-        int NP, str detector):
+        int NP, str detector, bint endpoint_correction=False):
+
+    if endpoint_correction and (N < 2 or (N & (N-1))):
+        raise ValueError("Endpoint correction requires a power-of-two N >= 2")
 
     if (NP != 8):
         print("Only 8 parameters are accepted: %d"%NP)
@@ -64,7 +71,11 @@ cpdef ComputeXYZ_FD(double[:] params, long N, double Tobs, double dt,
 
     #cdef char* c_detector = &detector[0]
 
-    Fast_GB(pars, N, Tobs, dt, c_XLS, c_YLS, c_ZLS, c_XSL, c_YSL, c_ZSL, NP, detector.encode('utf-8'))
+    if endpoint_correction:
+        Fast_GB_endpoint(pars, N, Tobs, dt, c_XLS, c_YLS, c_ZLS,
+                         c_XSL, c_YSL, c_ZSL, NP, detector.encode('utf-8'))
+    else:
+        Fast_GB(pars, N, Tobs, dt, c_XLS, c_YLS, c_ZLS, c_XSL, c_YSL, c_ZSL, NP, detector.encode('utf-8'))
 
     free(pars)
     return

@@ -83,6 +83,42 @@ The following waveforms are included in GWSpace unless otherwise noted:
 
   - With the help of `healpy` to generate a SGWB signal of power law type.
 
+## Optional FastGB endpoint quadrature
+
+`GCBWaveform.get_fastgb_fd_single`, `get_fastgb_fd`, and `get_fastgb_td` accept
+the keyword `endpoint_correction=True`. The default is `False`, retaining the
+original slow-envelope FFT, frequency grid, output support and normalization.
+
+```python
+frequency, X, Y, Z = waveform.get_fastgb_fd_single(
+    dt=10., oversample=8, endpoint_correction=True)
+```
+
+For a nonperiodic slow envelope `g`, the option subtracts the ramp
+`t/T * (g(T) - g(0))` conceptually and restores its finite-interval Fourier
+integral analytically. The C implementation evaluates the endpoint once and
+adds the equivalent correction directly to the existing, unnormalized complex
+FFT. It uses the same physical kernel and requires no additional dependencies.
+The correction includes the zero slow-frequency bin and uses a series near
+zero to avoid subtracting nearly equal terms. As with the native FFT path,
+adequate slow sampling is still required; this option requires a radix-two
+length of at least two.
+
+This improves quadrature of the existing FastGB model. It does not add complete
+optical-path time derivatives, finite-window TDI operator boundary terms or
+flexing-arm TDI. Residual quadrature error remains, especially in weak bins and
+short observations. The original C entry point `Fast_GB` is retained; Cython
+selects `Fast_GB_endpoint` only when requested.
+
+Run [the public example](examples/fastgb_endpoint_correction.py) to compare the
+two options against fine, extrapolated integrals of the same C model on fixed
+TianQin A/E bins:
+
+```shell
+python examples/fastgb_endpoint_correction.py
+python -m unittest discover -s tests -v
+```
+
 ## Author lists
 
 - [En-Kun Li](https://github.com/ekli-sysu)

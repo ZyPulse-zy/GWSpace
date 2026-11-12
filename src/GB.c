@@ -17,10 +17,10 @@
 double fstar;
 double Larm;
 
-void Fast_GB(double *params, long N, double Tobs, double dt, 
+static void fast_gb(double *params, long N, double Tobs, double dt,
         double *XLS, double *YLS, double *ZLS,
-        double* XSL, double* YSL, double* ZSL, int NP, 
-        char detector[])
+        double* XSL, double* YSL, double* ZSL, int NP,
+        char detector[], int endpoint_correction)
 {
 	long n;     // iterator
 	double t;	// time
@@ -33,11 +33,16 @@ void Fast_GB(double *params, long N, double Tobs, double dt,
 	wfm->NP = NP;				 // inform model of number of parameters being used
 	alloc_waveform(wfm);		 // allocate memory to hold pieces of waveform
 	copy_params(wfm, params);    // copy parameters to waveform structure
+	const int sender[6] = {0, 1, 0, 2, 1, 2};
+	const int receiver[6] = {1, 0, 2, 0, 2, 1};
+	double *data[6] = {wfm->data12, wfm->data21, wfm->data13,
+	                   wfm->data31, wfm->data23, wfm->data32};
+	double jump_r[6], jump_i[6];
 
 
 	get_basis_tensors(wfm);      //  Tensor construction for building slowly evolving LISA response
     // printf("This is for the detector %s\n", detector);
-	for(n=0; n<N; n++)
+	for(n=0; n<N+endpoint_correction; n++)
 	{
 		t = wfm->T*(double)(n)/(double)N; // First time sample must be at t=0 for phasing
 
@@ -62,10 +67,32 @@ void Fast_GB(double *params, long N, double Tobs, double dt,
 		calc_kdotr(wfm);		  // calculate dot product
 		get_transfer(wfm, t);     // Calculating Transfer function
 
-		fill_time_series(wfm, n); // Fill  time series data arrays with slowly evolving signal.
+		if (n == N) {
+			for (int link=0; link<6; link++) {
+				int s = sender[link], r = receiver[link];
+				jump_r[link] = wfm->TR[s][r] - data[link][0];
+				jump_i[link] = wfm->TI[s][r] - data[link][1];
+			}
+		} else fill_time_series(wfm, n);
 	}
 
 	fft_data(wfm);     // Numerical Fourier transform of slowly evolving signal
+	if (endpoint_correction) {
+		/* FFT of g(t)-t/T*(g(T)-g(0)), plus the exact ramp integral.
+		   This correction precedes the existing FFT normalization. */
+		for (n=0; n<N; n++) {
+			long m = n < N/2 ? n : n-N;
+			double z = PI2*(double)m/(double)N;
+			/* 1/z-cot(z/2)/2, including its finite limit at m=0. */
+			double h = fabs(z)<1e-3
+				? z*(1.0/12 + z*z*(1.0/720 + z*z/30240))
+				: 1.0/z - 0.5/tan(z/2);
+			for (int link=0; link<6; link++) {
+				data[link][2*n] += .5*jump_r[link] - h*jump_i[link];
+				data[link][2*n+1] += .5*jump_i[link] + h*jump_r[link];
+			}
+		}
+	}
 	unpack_data(wfm, dt);  // Unpack arrays from FFT and normalize
 
 
@@ -76,6 +103,20 @@ void Fast_GB(double *params, long N, double Tobs, double dt,
 	free_waveform(wfm);  // Deallocate memory
 
 	return;
+}
+
+void Fast_GB(double *params, long N, double Tobs, double dt,
+        double *XLS, double *YLS, double *ZLS,
+        double *XSL, double *YSL, double *ZSL, int NP, char detector[])
+{
+	fast_gb(params, N, Tobs, dt, XLS, YLS, ZLS, XSL, YSL, ZSL, NP, detector, 0);
+}
+
+void Fast_GB_endpoint(double *params, long N, double Tobs, double dt,
+        double *XLS, double *YLS, double *ZLS,
+        double *XSL, double *YSL, double *ZSL, int NP, char detector[])
+{
+	fast_gb(params, N, Tobs, dt, XLS, YLS, ZLS, XSL, YSL, ZSL, NP, detector, 1);
 }
 
 void calc_xi_f(struct Waveform *wfm, double t)
