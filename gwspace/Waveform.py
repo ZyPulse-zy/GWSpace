@@ -453,7 +453,7 @@ class GCBWaveform(BasicWaveform):
         # N=f*T, minimal f should be >=2*f_max according to Nyquist sampling theorem,
         # choose 3 for a conservative estimate.
         N = (3*2*fm) * self.T_obs
-        N = 1 << int(np.ceil(np.log2(N)))  # next power of 2
+        N = 1 << max(1, int(np.ceil(np.log2(N))))  # next power of 2, at least two
         return N*oversample
 
     def get_fastgb_fd_single(self, dt, oversample=1, detector='TianQin', buffer=None):
