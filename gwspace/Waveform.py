@@ -456,12 +456,15 @@ class GCBWaveform(BasicWaveform):
         N = 1 << int(np.ceil(np.log2(N)))  # next power of 2
         return N*oversample
 
-    def get_fastgb_fd_single(self, dt, oversample=1, detector='TianQin', buffer=None):
+    def get_fastgb_fd_single(self, dt, oversample=1, detector='TianQin', buffer=None, *, include_fddot=False):
         """ Calculate the GCB waveform using fast/slow decomposition.
 
         :param dt: Sampling step of time
         :param oversample: Should be a power of 2, or it will be not able to use gsl_fft
         :param detector:
+        :param include_fddot: Pass the second frequency derivative to the native
+            model. False preserves the historical eight-parameter response.
+            Slow sampling must also resolve the resulting chirp bandwidth.
         :param buffer: Should be a tuple with
         """
         # FIXME: assume T=T_obs below
@@ -476,6 +479,8 @@ class GCBWaveform(BasicWaveform):
         ZSL = np.zeros(2*N, 'd')
 
         params = np.array([self.f0, self.fdot, self.Beta, self.Lambda, self.amplitude, self.iota, self.psi, self.phi0])
+        if include_fddot:
+            params = np.append(params, self.fddot)
 
         if np.all(params) is not None:
             libFastGB.ComputeXYZ_FD(params, N, self.T_obs, dt, XLS, YLS, ZLS, XSL, YSL, ZSL,
@@ -503,17 +508,17 @@ class GCBWaveform(BasicWaveform):
             for i, a in enumerate((Xf, Yf, Zf)):
                 buffer[i][begb:endb] += a[bega:enda]
 
-    def get_fastgb_fd(self, dt, oversample=1, detector='TianQin'):
+    def get_fastgb_fd(self, dt, oversample=1, detector='TianQin', *, include_fddot=False):
         length = int(0.5*self.T_obs/dt)+1  # NFFT=int(T/dt), length=NFFT/2+1
         buffer = tuple(np.zeros(length, dtype=np.complex128) for _ in range(3))
 
         # for _ in table: TODO: make it support multiple sources?
-        self.get_fastgb_fd_single(dt, oversample, detector, buffer)
+        self.get_fastgb_fd_single(dt, oversample, detector, buffer, include_fddot=include_fddot)
         f = np.linspace(0, (length-1)*1.0/self.T_obs, length)
         return (f, ) + buffer
 
-    def get_fastgb_td(self, dt, oversample=1, detector='TianQin'):
-        f, X, Y, Z = self.get_fastgb_fd(dt, oversample, detector)
+    def get_fastgb_td(self, dt, oversample=1, detector='TianQin', *, include_fddot=False):
+        f, X, Y, Z = self.get_fastgb_fd(dt, oversample, detector, include_fddot=include_fddot)
         df = 1.0/self.T_obs
         kmin = round(f[0]/df)
 

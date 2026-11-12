@@ -29,9 +29,8 @@ cpdef ComputeXYZ_FD(double[:] params, long N, double Tobs, double dt,
         double[:] XSL, double[:] YSL, double[:] ZSL, 
         int NP, str detector):
 
-    if (NP != 8):
-        print("Only 8 parameters are accepted: %d"%NP)
-        return
+    if NP not in (8, 9) or len(params) < NP:
+        raise ValueError("FastGB requires eight or nine parameters")
 
     cdef double f0, df0, lat, lng, Amp, incl, psi, phi0
     cdef double* pars = <double*>malloc(NP * sizeof(double))
@@ -53,6 +52,8 @@ cpdef ComputeXYZ_FD(double[:] params, long N, double Tobs, double dt,
     pars[5] = psi
     pars[6] = phi0
     pars[7] = df0 * Tobs * Tobs
+    if NP == 9:
+        pars[8] = params[8] * Tobs * Tobs * Tobs
 
     #cdef double* c_pars = &paras[0]
     cdef double* c_XLS = &XLS[0]
