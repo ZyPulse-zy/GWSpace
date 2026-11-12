@@ -390,6 +390,17 @@ void free_waveform(struct Waveform *wfm)
 
 	free(wfm->params);
 
+	free(wfm->kdotr);
+	free(wfm->eplus);
+	free(wfm->ecross);
+	free(wfm->dplus);
+	free(wfm->dcross);
+	free(wfm->TR);
+	free(wfm->TI);
+	for (i=0; i<3; i++) free(wfm->d[i]);
+	free(wfm->d);
+	free(wfm);
+
 	return;
 }
 
