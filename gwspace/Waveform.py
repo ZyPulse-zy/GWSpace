@@ -446,7 +446,7 @@ class GCBWaveform(BasicWaveform):
     def _buffer_size(self, det, oversample=1):
         if det == 'TianQin':
             fm = 3.1771266198541054e-6  # fsc_tq
-        elif det in ('LISA', 'Taiji'):
+        elif det in ('LISA', 'Taiji', 'TaiJi'):
             fm = 3.168753578692357e-8  # EarthOrbitFreq_SI
         else:
             raise ValueError(f"Unknown detector {det}.")

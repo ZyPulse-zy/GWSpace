@@ -21,6 +21,14 @@ cdef extern from "spacecrafts.h":
     void spacecraft_TianQin(double t, double *x, double *y, double *z);
 
 
+def _native_detector_name(str detector):
+    if detector == "Taiji":
+        return "TaiJi"
+    if detector not in ("TianQin", "LISA", "TaiJi"):
+        raise ValueError(f"Unknown detector {detector}.")
+    return detector
+
+
 # Define the Cython functions
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
@@ -28,6 +36,8 @@ cpdef ComputeXYZ_FD(double[:] params, long N, double Tobs, double dt,
         double[:] XLS, double[:] YLS, double[:] ZLS, 
         double[:] XSL, double[:] YSL, double[:] ZSL, 
         int NP, str detector):
+
+    detector = _native_detector_name(detector)
 
     if (NP != 8):
         print("Only 8 parameters are accepted: %d"%NP)
@@ -70,6 +80,7 @@ cpdef ComputeXYZ_FD(double[:] params, long N, double Tobs, double dt,
     return
 
 cpdef Compute_position(double t, double[:] x, double[:] y, double[:] z, str detector):
+    detector = _native_detector_name(detector)
     cdef double* c_x = &x[0]
     cdef double* c_y = &y[0]
     cdef double* c_z = &z[0]
@@ -84,6 +95,7 @@ cpdef Compute_position(double t, double[:] x, double[:] y, double[:] z, str dete
     return
 
 cpdef Orbits(str detector, int N, double[:] t, double[:] x, double[:] y, double[:] z, double[:] Larm):
+    detector = _native_detector_name(detector)
     cdef double* c_t = &t[0];
     cdef double* c_x = &x[0];
     cdef double* c_y = &y[0];
