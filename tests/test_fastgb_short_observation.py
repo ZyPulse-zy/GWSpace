@@ -11,7 +11,7 @@ def waveform(days):
 
 class ShortObservationTests(unittest.TestCase):
     def test_positive_short_record_has_radix_two_buffer(self):
-        for days in [1,7,30]:
+        for days in [.01,.4,1,7,30]:
             for detector in ['TianQin','LISA','Taiji']:
                 with self.subTest(days=days,detector=detector):
                     n=waveform(days)._buffer_size(detector)
@@ -19,9 +19,21 @@ class ShortObservationTests(unittest.TestCase):
                     self.assertEqual(n&(n-1),0)
 
     def test_short_native_tianqin_and_lisa_are_finite(self):
-        for detector in ['TianQin','LISA']:
-            _,*response=waveform(7).get_fastgb_fd_single(10.,8,detector=detector)
-            self.assertTrue(np.isfinite(response).all())
+        for days in [.01,.4,1,7,30,45,60]:
+            for detector in ['TianQin','LISA']:
+                for oversample in [1,8]:
+                    with self.subTest(days=days,detector=detector,oversample=oversample):
+                        _,*response=waveform(days).get_fastgb_fd_single(
+                            10.,oversample,detector=detector)
+                        self.assertTrue(np.isfinite(response).all())
+
+    def test_already_valid_oversampled_buffers_are_unchanged(self):
+        # A one-point base estimate can still yield a valid oversampled FFT.
+        for days,detector in [(.4,'TianQin'),(45,'LISA'),(45,'Taiji')]:
+            for oversample in [2,8]:
+                with self.subTest(days=days,detector=detector,oversample=oversample):
+                    self.assertEqual(waveform(days)._buffer_size(detector,oversample),
+                                     oversample)
 
     def test_long_record_buffers_are_unchanged(self):
         self.assertEqual(waveform(90)._buffer_size('TianQin',8),2048)
